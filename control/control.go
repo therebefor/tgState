@@ -52,13 +52,17 @@ func UploadImageAPI(w http.ResponseWriter, r *http.Request) {
 			Code:    0,
 			Message: "error",
 		}
-		img := conf.FileRoute + utils.UpDocument(utils.TgFileData(header.Filename, file))
-		if img != conf.FileRoute {
+		fileID, msgID, chatID := utils.UpDocument(utils.TgFileData(header.Filename, file))
+		img := conf.FileRoute + fileID
+		if fileID != "" {
+			link := strings.TrimSuffix(conf.BaseUrl, "/") + img
 			res = conf.UploadResponse{
 				Code:    1,
 				Message: img,
-				ImgUrl:  strings.TrimSuffix(conf.BaseUrl, "/") + img,
+				ImgUrl:  link,
 			}
+			// 同步发送：Vercel 上函数返回响应后实例会被冻结，不能用 goroutine
+			utils.ReplyLink(chatID, msgID, link)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

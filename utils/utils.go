@@ -18,11 +18,11 @@ func TgFileData(fileName string, fileData io.Reader) tgbotapi.FileReader {
 	}
 }
 
-func UpDocument(fileData tgbotapi.FileReader) string {
+func UpDocument(fileData tgbotapi.FileReader) (string, int, int64) {
 	bot, err := tgbotapi.NewBotAPI(conf.BotToken)
 	if err != nil {
 		log.Println(err)
-		return ""
+		return "", 0, 0
 	}
 	// Upload the file to Telegram
 	params := tgbotapi.Params{
@@ -51,7 +51,23 @@ func UpDocument(fileData tgbotapi.FileReader) string {
 	case msg.Sticker != nil:
 		resp = msg.Sticker.FileID
 	}
-	return resp
+	return resp, msg.MessageID, msg.Chat.ID
+}
+
+// ReplyLink 在对话中对指定消息以回复的形式发送文件链接
+func ReplyLink(chatID int64, replyTo int, link string) {
+	bot, err := tgbotapi.NewBotAPI(conf.BotToken)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, link)
+	msg.ReplyToMessageID = replyTo
+	msg.DisableWebPagePreview = true
+	msg.DisableNotification = true
+	if _, err := bot.Send(msg); err != nil {
+		log.Println("回复文件链接失败:", err)
+	}
 }
 
 func GetDownloadUrl(fileID string) (string, bool) {
