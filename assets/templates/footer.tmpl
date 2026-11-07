@@ -6,6 +6,7 @@
             uploadImg(file, 1).then((url) => {
                 // 处理上传成功的情况
                 console.log(url);
+                addHistory(file.name, toFullUrl(url));
             }).catch((error) => {
                 // 处理上传失败的情况
                 console.error(error);
@@ -47,7 +48,9 @@
                     // 将字符串转换为 Blob 对象
                     var blob = new Blob([temp], { type: 'text/plain' });
                     var fileAll = new File([blob], 'fileAll.txt', { type: 'text/plain' });
-                    return uploadImg(fileAll, 1);
+                    return uploadImg(fileAll, 1).then((url) => {
+                        addHistory(file.name, toFullUrl(url));
+                    });
                 })
                 .catch((error) => {
                     // 处理上传失败的情况
@@ -195,7 +198,77 @@
                 }
             });
         });
+    var HISTORY_KEY = "tgstate_history";
+    var HISTORY_MAX = 50;
+
+    function toFullUrl(path) {
+        if (!path) {
+            return "";
+        }
+        return /^https?:\/\//i.test(path) ? path : window.location.origin + path;
+    }
+
+    function loadHistory() {
+        try {
+            var list = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+            return Array.isArray(list) ? list : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function addHistory(name, url) {
+        if (!url) {
+            return;
+        }
+        var list = loadHistory();
+        list.unshift({ name: name, url: url, time: Date.now() });
+        try {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX)));
+        } catch (e) {
+            return;
+        }
+        renderHistory();
+    }
+
+    function renderHistory() {
+        var box = document.getElementById("history");
+        var listEl = document.getElementById("history-list");
+        if (!box || !listEl) {
+            return;
+        }
+        var list = loadHistory();
+        listEl.textContent = "";
+        if (list.length === 0) {
+            box.style.display = "none";
+            return;
+        }
+        box.style.display = "";
+        for (var i = 0; i < list.length; i++) {
+            var item = list[i] || {};
+            var url = toFullUrl(item.url);
+            var li = document.createElement("li");
+            var a = document.createElement("a");
+            a.className = "history-name";
+            a.href = url;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = item.name || url;
+            var span = document.createElement("span");
+            span.className = "history-url";
+            span.textContent = url;
+            li.appendChild(a);
+            li.appendChild(span);
+            listEl.appendChild(li);
+        }
+    }
+
+    $(document).ready(renderHistory);
 </script>
+<details id="history" style="display: none">
+    <summary>历史上传记录</summary>
+    <ul id="history-list"></ul>
+</details>
 <a target="_blank" href="https://github.com/csznet/tgState"><svg version="1.1" id="Layer_1"
         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="44px"
         height="15px" viewBox="0 0 44 15" enable-background="new 0 0 44 15" xml:space="preserve">
