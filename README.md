@@ -63,6 +63,14 @@ https://tgstate.vercel.app
  - ```p``` 代表网盘模式运行，不限制上传后缀，大于 10MB 的文件自动分片上传
  - ```m``` 在p模式的基础上关闭网页上传，可私聊进行上传（如果target是个人，则只支持指定用户进行私聊上传
 
+## 上传额度（防滥用）
+
+网页默认每个浏览器每天最多上传 10 个文件/图片，按本地自然日统计，次日自动重置，额度用完后页面会提示“今日次数已用完”。
+
+额度记录在浏览器的 localStorage 中（键名 `tgstate_quota`），因此清理浏览器数据、使用无痕窗口或更换浏览器都会重新计算；这是前端防护，可挡住误用与普通滥用，但无法阻止有意绕过。
+
+如需调整数量，修改 `assets/templates/files.tmpl` 与 `assets/templates/images.tmpl` 中 `tgstate-page-config` 的 `dailyLimit` 值（正整数）即可。
+
 ## url
 
 bot获取FileID的前置域名地址自动补充及api返回完整url的补充

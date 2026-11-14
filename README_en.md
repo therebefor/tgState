@@ -63,6 +63,14 @@ Fill in the access password. If not needed, fill in ```none``` directly.
 - ```p``` represents running in cloud drive mode, with no restriction on uploaded suffixes (files over 10MB are uploaded in chunks).
 - ```m``` On top of the p mode, web upload is disabled, and upload can be done via private chat (if the target is an individual, only specified users can upload via private chat).
 
+## Upload quota (anti-abuse)
+
+The web page allows at most 10 uploads per browser per calendar day by default. The quota resets automatically the next day, and the page shows "今日次数已用完" once it is exhausted.
+
+The quota is stored in the browser's localStorage (key `tgstate_quota`), so clearing browser data, using a private window, or switching browsers resets it. This is a client-side guard: it deters mistakes and casual abuse but cannot stop a determined bypass.
+
+To change the limit, edit `dailyLimit` (a positive integer) in the `tgstate-page-config` block of `assets/templates/files.tmpl` and `assets/templates/images.tmpl`.
+
 ## url
 
 The pre-domain address that bot obtains FileID is automatically filled in.

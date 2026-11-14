@@ -25,6 +25,7 @@
                         accept=".jpg, .jpeg, .png" />
                     <div class="composer-bar">
                         <span class="composer-meta" id="uploadMeta">尚未选择图片</span>
+                        <span class="composer-quota" id="quotaHint" title="每个浏览器每天最多上传 10 个文件/图片，次日自动重置">今日剩余 10 次</span>
                         <button id="uploadButton" class="send-btn" type="button" aria-label="上传图片" title="上传图片">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -54,5 +55,5 @@
                 </details>
             </div>
         </section>
-    <script type="application/json" id="tgstate-page-config">{"mode":"image","maxFileSize":20971520,"chunkSize":20971520}</script>
+    <script type="application/json" id="tgstate-page-config">{"mode":"image","maxFileSize":20971520,"chunkSize":20971520,"dailyLimit":10}</script>
 {{template "public/footer" .}}

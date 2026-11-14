@@ -378,12 +378,25 @@
         }
 
         .composer-meta {
+            flex: 1;
             min-width: 0;
             overflow: hidden;
             color: var(--faint);
             font-size: 13px;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .composer-quota {
+            flex: none;
+            color: var(--faint);
+            font-size: 12.5px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .composer-quota.is-empty {
+            color: var(--danger);
         }
 
         .send-btn {

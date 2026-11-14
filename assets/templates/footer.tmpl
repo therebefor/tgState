@@ -22,7 +22,7 @@
             var DEFAULT_LOADING_TEXT = '正在上传…';
 
             // 页面级配置：图床模式下限制单张图片大小，且不做分片上传
-            var PAGE_CONFIG = { mode: 'file', maxFileSize: 0, chunkSize: CHUNK_SIZE };
+            var PAGE_CONFIG = { mode: 'file', maxFileSize: 0, chunkSize: CHUNK_SIZE, dailyLimit: 10 };
             (function readPageConfig() {
                 var node = document.getElementById('tgstate-page-config');
                 if (!node) return;
@@ -37,6 +37,8 @@
                 if (isFinite(max) && max > 0) PAGE_CONFIG.maxFileSize = max;
                 var chunk = Number(parsed.chunkSize);
                 if (isFinite(chunk) && chunk > 0) PAGE_CONFIG.chunkSize = chunk;
+                var dailyLimit = Number(parsed.dailyLimit);
+                if (isFinite(dailyLimit) && dailyLimit >= 0) PAGE_CONFIG.dailyLimit = Math.floor(dailyLimit);
             })();
 
             var CHECK_ICON = '<path d="M20 6 9 17l-5-5"/>';
@@ -56,6 +58,7 @@
             var historyEl = document.getElementById('history');
             var historyListEl = document.getElementById('history-list');
             var historyCountEl = document.getElementById('history-count');
+            var quotaHintEl = document.getElementById('quotaHint');
 
             var defaultName = nameEl ? nameEl.textContent : '';
             var defaultMeta = metaEl ? metaEl.textContent : '';
@@ -101,6 +104,61 @@
                     unit += 1;
                 } while (value >= 1024 && unit < units.length - 1);
                 return (value >= 10 || unit === 0 ? Math.round(value) : Math.round(value * 10) / 10) + ' ' + units[unit];
+            }
+
+            // ---- 每日上传额度（防滥用）：每个浏览器一个自然日最多 N 个文件/图片 ----
+            var QUOTA_KEY = 'tgstate_quota';
+
+            function pad2(number) {
+                return (number < 10 ? '0' : '') + number;
+            }
+
+            function todayStr() {
+                var d = new Date();
+                return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+            }
+
+            function loadQuota() {
+                var row = { date: todayStr(), used: 0 };
+                try {
+                    var raw = window.localStorage.getItem(QUOTA_KEY);
+                    var saved = raw ? JSON.parse(raw) : null;
+                    if (saved && saved.date === row.date) {
+                        var used = Number(saved.used);
+                        if (isFinite(used) && used >= 0) row.used = Math.min(Math.floor(used), PAGE_CONFIG.dailyLimit);
+                    }
+                } catch (error) {
+                    // localStorage 不可用时视为未使用
+                }
+                return row;
+            }
+
+            function saveQuota(row) {
+                try {
+                    window.localStorage.setItem(QUOTA_KEY, JSON.stringify(row));
+                } catch (error) {
+                    // 忽略写入失败
+                }
+            }
+
+            function quotaLeft() {
+                return Math.max(0, PAGE_CONFIG.dailyLimit - loadQuota().used);
+            }
+
+            function refreshQuotaHint() {
+                if (!quotaHintEl) return;
+                var left = quotaLeft();
+                quotaHintEl.textContent = left > 0 ? '今日剩余 ' + left + ' 次' : '今日次数已用完';
+                quotaHintEl.title = '每个浏览器每天最多上传 ' + PAGE_CONFIG.dailyLimit + ' 个文件/图片，次日自动重置';
+                if (left > 0) quotaHintEl.classList.remove('is-empty');
+                else quotaHintEl.classList.add('is-empty');
+            }
+
+            function consumeQuota() {
+                var row = loadQuota();
+                row.used += 1;
+                saveQuota(row);
+                refreshQuotaHint();
             }
 
             function toFullUrl(path) {
@@ -222,6 +280,10 @@
                     for (var i = 0; i < files.length; i += 1) {
                         var file = files[i];
                         setMeta('正在上传 ' + (i + 1) + ' / ' + files.length + ' · ' + file.name);
+                        if (quotaLeft() <= 0) {
+                            showError(new Error('今日上传次数已用完，每天最多上传 ' + PAGE_CONFIG.dailyLimit + ' 个'), file.name);
+                            break;
+                        }
                         if (PAGE_CONFIG.maxFileSize > 0 && file.size > PAGE_CONFIG.maxFileSize) {
                             showError(new Error('图片不能超过 ' + formatSize(PAGE_CONFIG.maxFileSize)), file.name);
                             continue;
@@ -230,6 +292,7 @@
                             var result = await uploadFile(file, function (part, parts) {
                                 setLoading('正在上传 ' + file.name + '（分片 ' + part + ' / ' + parts + '）');
                             });
+                            consumeQuota();
                             showSuccess(file, result);
                             addHistory(result.name, result.link);
                         } catch (error) {
@@ -517,6 +580,7 @@
 
             initUploader();
             renderHistory();
+            refreshQuotaHint();
         })();
     </script>
 </body>
