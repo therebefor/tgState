@@ -3,7 +3,7 @@
             <div class="wrap">
                 <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Telegram 驱动的无服务器存储</p>
                 <h1>上传图片到 Telegram</h1>
-                <p class="sub">图片直接存入你的 Telegram 频道，返回永久外链。支持拖拽与剪贴板粘贴，不占用服务器磁盘。</p>
+                <p class="sub">图片直接存入TG频道，返回永久外链。支持拖拽与剪贴板粘贴，不占用服务器磁盘。</p>
             </div>
         </section>
         <section class="work">
@@ -19,7 +19,7 @@
                             </svg>
                         </span>
                         <span class="dz-title" id="uploadFileName">点击选择图片，或拖到这里</span>
-                        <span class="dz-hint">支持 JPG · PNG · 超过 10 MB 自动分片上传</span>
+                        <span class="dz-hint">支持 JPG · PNG · 单张不超过 20 MB</span>
                     </label>
                     <input type="file" name="image" id="uploadFile" class="visually-hidden" multiple
                         accept=".jpg, .jpeg, .png" />
@@ -54,4 +54,5 @@
                 </details>
             </div>
         </section>
+    <script type="application/json" id="tgstate-page-config">{"mode":"image","maxFileSize":20971520,"chunkSize":20971520}</script>
 {{template "public/footer" .}}

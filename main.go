@@ -58,6 +58,7 @@ func init() {
 		OptApi = false
 	}
 	if conf.Mode != "p" && conf.Mode != "m" {
-		conf.Mode = "p"
+		// 默认使用图床模式（i），如需网盘模式请设置 -mode p
+		conf.Mode = "i"
 	}
 }

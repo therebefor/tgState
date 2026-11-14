@@ -59,7 +59,8 @@ Fill in the access password. If not needed, fill in ```none``` directly.
 
 ## mode
 
-- ```p``` represents running in cloud drive mode, with no restriction on uploaded suffixes.
+- Default (empty or ```i```) is image host mode: only jpg/jpeg/png images are accepted, max 20MB per image.
+- ```p``` represents running in cloud drive mode, with no restriction on uploaded suffixes (files over 10MB are uploaded in chunks).
 - ```m``` On top of the p mode, web upload is disabled, and upload can be done via private chat (if the target is an individual, only specified users can upload via private chat).
 
 ## url
@@ -131,7 +132,7 @@ docker run -d -p 8088:8088 --name tgstate -e token=aaa -e target=@bbb --net=host
 
 ## Vercel
 
-Does not support files larger than 5MB and does not support Telegram in getting file paths.
+Image host mode caps each image at 20MB; Vercel limits request bodies to about 4.5MB, so on Vercel the effective limit is about 4.5MB. Does not support Telegram in getting file paths.
 
 [Click here to go to the Vercel configuration page](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcsznet%2FtgState&env=token&env=target&env=pass&env=mode&project-name=tgState&repository-name=tgState)
 

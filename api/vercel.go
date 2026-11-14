@@ -14,6 +14,10 @@ func Vercel(w http.ResponseWriter, r *http.Request) {
 	conf.ChannelName = os.Getenv("target")
 	conf.Pass = os.Getenv("pass")
 	conf.Mode = os.Getenv("mode")
+	// 默认（未设置或非 p/m）运行图床模式
+	if conf.Mode != "p" && conf.Mode != "m" {
+		conf.Mode = "i"
+	}
 	conf.BaseUrl = os.Getenv("url")
 	// 获取请求路径
 	path := r.URL.Path

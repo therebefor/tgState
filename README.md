@@ -59,7 +59,8 @@ https://tgstate.vercel.app
 
 ## mode
 
- - ```p``` 代表网盘模式运行，不限制上传后缀
+ - 默认（不填或填 ```i```）为图床模式，仅支持 jpg/jpeg/png 图片，单张不超过 20MB
+ - ```p``` 代表网盘模式运行，不限制上传后缀，大于 10MB 的文件自动分片上传
  - ```m``` 在p模式的基础上关闭网页上传，可私聊进行上传（如果target是个人，则只支持指定用户进行私聊上传
 
 ## url
@@ -141,12 +142,13 @@ docker run -d -p 8088:8088 --name tgstate 参数 --net=host csznet/tgstate:lates
 
 **例子**
 ```
-docker run -d -p 8088:8088 --name tgstate -e token=token -e target=@target -e mode=p --net=host csznet/tgstate:latest
+docker run -d -p 8088:8088 --name tgstate -e token=token -e target=@target -e mode=i --net=host csznet/tgstate:latest
 ```
+其中 `-e mode=i` 为图床模式（默认），如需网盘模式改为 `-e mode=p`
 
 ## Vercel
 
-不支持大于5mb文件，不支持tg获取文件路径
+图床模式单张图片上限 20MB；Vercel 请求体限制约 4.5MB，因此部署在 Vercel 时实际可上传的图片约为 4.5MB。不支持tg获取文件路径
 
  [点我传送至Vercel配置页面](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcsznet%2FtgState&env=token&env=target&env=pass&env=mode&env=url&project-name=tgState&repository-name=tgState)  
 

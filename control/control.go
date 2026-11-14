@@ -28,8 +28,8 @@ func UploadImageAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer file.Close()
-		if conf.Mode != "p" && r.ContentLength > 20*1024*1024 {
-			// 检查文件大小
+		if conf.Mode != "p" && header.Size > 20*1024*1024 {
+			// 图床模式：单张图片不超过 20 MB；网盘模式（mode=p）不受此限制
 			errJsonMsg("File size exceeds 20MB limit", w)
 			return
 		}
