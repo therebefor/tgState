@@ -23,7 +23,7 @@ Hosted on Vercel, resource limitations - files larger than 5MB are not supported
 
 Demo image:
 
-![tgState](https://tgstate.vercel.app/d/BQACAgUAAx0EcyK3ugACByxlOR-Nfl4esavoO4zdaYIP_k1KYQACDAsAAkf4yFVpf_awaEkS8jAE)
+![tgState image host UI](docs/screenshot.jpg)
 
 # Parameter Description
 

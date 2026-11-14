@@ -23,7 +23,7 @@ https://tgstate.vercel.app
 
 演示图片：
 
-![tgState](https://tgstate.vercel.app/d/BQACAgUAAx0EcyK3ugACByxlOR-Nfl4esavoO4zdaYIP_k1KYQACDAsAAkf4yFVpf_awaEkS8jAE)  
+![tgState 图床模式界面](docs/screenshot.jpg)
 
 # 参数说明
 
