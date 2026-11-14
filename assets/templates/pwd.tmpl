@@ -1,2 +1,30 @@
 {{template "public/header" .}}
-<body class="password"><div class="form-container"><form action="/pwd" method="POST"><input name="p" class="form-input" type="text" placeholder="请输入密码"> <button class="form-button" type="submit">提交</button></form><p style="color:#b0b0b0">Powered by tgState</p></div></body>
+        <section class="auth">
+            <div class="wrap">
+                <div class="auth-card">
+                    <span class="auth-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </span>
+                    <h1 class="auth-title">请输入访问密码</h1>
+                    <p class="auth-sub">此站点受密码保护，验证后即可上传与查看文件。</p>
+                    <form action="/pwd" method="POST" class="auth-form">
+                        <input name="p" class="auth-input" type="password" placeholder="访问密码"
+                            autocomplete="current-password" required />
+                        <button class="auth-button" type="submit">进入</button>
+                    </form>
+                    <p class="auth-hint">Powered by tgState</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="site-footer">
+        <div class="wrap footer-inner">
+            <p>tgState · 把文件存进 Telegram</p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,288 +1,501 @@
 {{define "public/footer"}}
-<script>
-    function uploadFile(file) {
-        var limit = 10 * 1024 * 1024;
-        if (file.size <= limit) {
-            uploadImg(file, 1).then((url) => {
-                // 处理上传成功的情况
-                console.log(url);
-                addHistory(file.name, toFullUrl(url));
-            }).catch((error) => {
-                // 处理上传失败的情况
-                console.error(error);
-            });
-        } else {
-            // 文件大于20MB，需要分割成多个块
-            var chunkSize = limit; // 20MB
-            var start = 0;
-            var end = Math.min(chunkSize, file.size);
-            function uploadNextChunk() {
-                if (start < file.size) {
-                    var chunk = file.slice(start, end);
-                    return uploadImg(chunk, 0)
-                        .then((url) => {
-                            // 处理上传成功的情况
-                            temp = temp + '\n' + url.replace(/^\/d\//, ''); // 每次改变值都换行
-                            start = end;
-                            end = Math.min(start + chunkSize, file.size);
-                            return uploadNextChunk(); // 上传下一个块
-                        })
-                        .catch((error) => {
-                            // 处理上传失败的情况
-                            console.error(error);
-                            var t = $('<div class="response-item response-error">上传失败(' + e.message + ')</div>');
-                            $("#response").prepend(t);
-                            return Promise.reject("Upload failed"); // 终止上传
-                        });
-                } else {
-                    return Promise.resolve(); // 如果所有块都上传完成，返回一个已解决的 Promise
-                }
+    </main>
+    <footer class="site-footer">
+        <div class="wrap footer-inner">
+            <p>tgState · 把文件存进 Telegram</p>
+            <p class="footer-links">
+                <a href="https://github.com/csznet/tgState" target="_blank" rel="noopener">GitHub</a>
+                <span aria-hidden="true">·</span>
+                <a href="https://core.telegram.org/bots/api" target="_blank" rel="noopener">Telegram Bot API</a>
+            </p>
+        </div>
+    </footer>
+    <script>
+        (function () {
+            'use strict';
 
+            var API_ENDPOINT = '/api';
+            var CHUNK_SIZE = 10 * 1024 * 1024;
+            var HISTORY_KEY = 'tgstate_history';
+            var HISTORY_MAX = 50;
+            var DEFAULT_LOADING_TEXT = '正在上传…';
+
+            var CHECK_ICON = '<path d="M20 6 9 17l-5-5"/>';
+            var ALERT_ICON = '<path d="M12 9v4"/><path d="M12 17h.01"/>' +
+                '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>';
+            var COPY_ICON = '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>' +
+                '<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>';
+
+            var fileInput = document.getElementById('uploadFile');
+            var dropzone = document.getElementById('uploadFileLabel');
+            var nameEl = document.getElementById('uploadFileName');
+            var metaEl = document.getElementById('uploadMeta');
+            var uploadButton = document.getElementById('uploadButton');
+            var loadingEl = document.getElementById('loading');
+            var loadingTextEl = document.getElementById('loadingText');
+            var responseEl = document.getElementById('response');
+            var historyEl = document.getElementById('history');
+            var historyListEl = document.getElementById('history-list');
+            var historyCountEl = document.getElementById('history-count');
+
+            var defaultName = nameEl ? nameEl.textContent : '';
+            var defaultMeta = metaEl ? metaEl.textContent : '';
+            var selected = [];
+            var busy = false;
+            var chipTimers = new WeakMap();
+
+            function el(tag, className, text) {
+                var node = document.createElement(tag);
+                if (className) node.className = className;
+                if (text !== undefined && text !== null) node.textContent = text;
+                return node;
             }
-            var temp = "tgstate-blob";
-            temp = temp + '\n' + file.name;
-            temp = temp + '\nsize' + file.size;
-            uploadNextChunk()
-                .then(() => {
-                    console.log(temp); // 所有块上传完成后打印
-                    // 将字符串转换为 Blob 对象
-                    var blob = new Blob([temp], { type: 'text/plain' });
-                    var fileAll = new File([blob], 'fileAll.txt', { type: 'text/plain' });
-                    return uploadImg(fileAll, 1).then((url) => {
-                        addHistory(file.name, toFullUrl(url));
-                    });
-                })
-                .catch((error) => {
-                    // 处理上传失败的情况
-                    console.error(error);
+
+            function icon(paths, size) {
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('width', String(size));
+                svg.setAttribute('height', String(size));
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '2');
+                svg.setAttribute('stroke-linecap', 'round');
+                svg.setAttribute('stroke-linejoin', 'round');
+                svg.setAttribute('aria-hidden', 'true');
+                svg.innerHTML = paths;
+                return svg;
+            }
+
+            function escapeHtml(value) {
+                return String(value === undefined || value === null ? '' : value).replace(/[&<>"']/g, function (ch) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
                 });
-        }
-    }
-    function uploadImg(e, ms) {
-        return new Promise((resolve, reject) => {
-            var o = new FormData();
-            o.append("image", e);
-            var isImage = e.type.startsWith('image/');
-            $("#uploadButton").prop("disabled", !0);
-            $("#uploadButton").text("上传中");
-            $("#loading").show();
-            var a = window.location.protocol + "//" + window.location.hostname;
-            "80" !== window.location.port &&
-                0 < window.location.port.length &&
-                (a = a + ":" + window.location.port),
-                $.ajax({
-                    type: "POST",
-                    url: a + "/api",
-                    data: o,
-                    contentType: !1,
-                    processData: !1,
-                    success: function (e) {
-                        var link = a + e.message;
-                        var t;
-                        if (e.code == 1) {
-                            if (ms) {
-                                if (isImage) {
-                                    t = $(
-                                        '<div class="response-item response-success">上传成功，图片外链：<a target="_blank" href="' +
-                                        link +
-                                        '">' +
-                                        link +
-                                        '</a><div class="copy-links"><span class="copy-code" data-clipboard-text="&lt;img src=&quot;' +
-                                        link +
-                                        '&quot; alt=&quot;Your Alt Text&quot;&gt;">HTML</span><span class="copy-code" data-clipboard-text="![Alt Text](' +
-                                        link +
-                                        ')">Markdown</span><span class="copy-code" data-clipboard-text="[img]' +
-                                        link +
-                                        '[/img]">BBCode</span></div></div>'
-                                    );
-                                } else {
-                                    t = $(
-                                        '<div class="response-item response-success">上传成功，文件外链：<a target="_blank" href="' +
-                                        link +
-                                        '">' +
-                                        link +
-                                        "</a></div>"
-                                    );
-                                }
-                            }
-                            resolve(e.message);
-                        } else {
-                            var t = $('<div class="response-item response-error">上传失败(' + e.message + ')</div>');
-                            reject("上传失败(" + e.message + ")");
+            }
+
+            function formatSize(bytes) {
+                var value = Number(bytes) || 0;
+                if (value < 1024) return value + ' B';
+                var units = ['KB', 'MB', 'GB', 'TB'];
+                var unit = -1;
+                do {
+                    value /= 1024;
+                    unit += 1;
+                } while (value >= 1024 && unit < units.length - 1);
+                return (value >= 10 || unit === 0 ? Math.round(value) : Math.round(value * 10) / 10) + ' ' + units[unit];
+            }
+
+            function toFullUrl(path) {
+                if (!path) return '';
+                if (/^https?:\/\//i.test(path)) return path;
+                return window.location.origin + (path.charAt(0) === '/' ? path : '/' + path);
+            }
+
+            function setMeta(text) {
+                if (metaEl) metaEl.textContent = text;
+            }
+
+            function setName(text, title) {
+                if (!nameEl) return;
+                nameEl.textContent = text;
+                nameEl.title = title || '';
+            }
+
+            function setLoading(text) {
+                if (loadingTextEl) loadingTextEl.textContent = text || DEFAULT_LOADING_TEXT;
+            }
+
+            function setBusy(state) {
+                busy = !!state;
+                if (uploadButton) uploadButton.disabled = busy;
+                if (loadingEl) loadingEl.hidden = !busy;
+                setLoading(DEFAULT_LOADING_TEXT);
+            }
+
+            function updateSelection() {
+                if (!dropzone) return;
+                if (!selected.length) {
+                    dropzone.classList.remove('has-files');
+                    setName(defaultName);
+                    setMeta(defaultMeta);
+                    return;
+                }
+                dropzone.classList.add('has-files');
+                if (selected.length === 1) {
+                    setName(selected[0].name, selected[0].name);
+                    setMeta(selected[0].name + ' · ' + formatSize(selected[0].size));
+                    return;
+                }
+                var total = 0;
+                for (var i = 0; i < selected.length; i += 1) total += selected[i].size;
+                setName('已选择 ' + selected.length + ' 个文件');
+                setMeta(selected.length + ' 个文件 · 共 ' + formatSize(total));
+            }
+
+            function resetSelection() {
+                selected = [];
+                if (fileInput) fileInput.value = '';
+                setLoading(DEFAULT_LOADING_TEXT);
+                updateSelection();
+            }
+
+            function takeFiles(fileList) {
+                var files = Array.prototype.slice.call(fileList || []);
+                if (!files.length) return false;
+                selected = files;
+                updateSelection();
+                return true;
+            }
+
+            function uploadRequest(blob, filename) {
+                var form = new FormData();
+                if (filename) form.append('image', blob, filename);
+                else form.append('image', blob);
+                return fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    body: form,
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                }).then(function (response) {
+                    if (response.status === 401 || response.status === 403) {
+                        throw new Error('没有访问权限，请刷新页面后重新验证');
+                    }
+                    if (!response.ok) {
+                        throw new Error('服务器返回 HTTP ' + response.status);
+                    }
+                    return response.json();
+                }).then(function (data) {
+                    if (!data || data.code !== 1) {
+                        var message = data && (data.message || data.msg);
+                        throw new Error(message ? String(message) : '上传失败，请稍后重试');
+                    }
+                    return data;
+                });
+            }
+
+            async function uploadFile(file, onProgress) {
+                if (file.size <= CHUNK_SIZE) {
+                    var single = await uploadRequest(file, file.name);
+                    return { name: file.name, link: single.message };
+                }
+                var totalParts = Math.ceil(file.size / CHUNK_SIZE);
+                var index = 'tgstate-blob\n' + file.name + '\nsize' + file.size;
+                var offset = 0;
+                var part = 0;
+                while (offset < file.size) {
+                    part += 1;
+                    if (onProgress) onProgress(part, totalParts);
+                    var chunk = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
+                    var chunkData = await uploadRequest(chunk);
+                    index += '\n' + String(chunkData.message || '').replace(/^\/d\//, '');
+                    offset += chunk.size;
+                }
+                var indexFile = new File([index], 'fileAll.txt', { type: 'text/plain' });
+                var indexData = await uploadRequest(indexFile, 'fileAll.txt');
+                return { name: file.name, link: indexData.message };
+            }
+
+            async function uploadSelected() {
+                if (busy || !selected.length) return;
+                var files = selected.slice();
+                selected = [];
+                setBusy(true);
+                try {
+                    for (var i = 0; i < files.length; i += 1) {
+                        var file = files[i];
+                        setMeta('正在上传 ' + (i + 1) + ' / ' + files.length + ' · ' + file.name);
+                        try {
+                            var result = await uploadFile(file, function (part, parts) {
+                                setLoading('正在上传 ' + file.name + '（分片 ' + part + ' / ' + parts + '）');
+                            });
+                            showSuccess(file, result);
+                            addHistory(result.name, result.link);
+                        } catch (error) {
+                            showError(error, file.name);
                         }
-                        $("#response").prepend(t);
-                        $("#uploadFile").val("");
-                        $("#uploadFileLabel")
-                            .text("选择文件")
-                            .css("background-color", "#007BFF");
+                    }
+                } finally {
+                    setBusy(false);
+                    resetSelection();
+                }
+            }
 
-                        $(".copy-code").click(function () {
-                            var code = $(this).data("clipboard-text");
-                            var input = $("<input>");
-                            $("body").append(input);
-                            input.val(code).select();
-                            document.execCommand("copy");
-                            input.remove();
-                            var copyButton = $(this);
-                            var originalText = copyButton.text();
-                            copyButton.text("复制成功");
-                            setTimeout(function () {
-                                copyButton.text(originalText);
-                            }, 1000);
+            function showSuccess(file, result) {
+                if (!responseEl) return;
+                var url = toFullUrl(result.link);
+                if (!url) return;
+                var isImage = (file.type || '').indexOf('image/') === 0;
+                var formats = { link: url };
+                if (isImage) {
+                    var safeUrl = escapeHtml(url);
+                    var safeAlt = escapeHtml(file.name);
+                    formats.html = '<img src="' + safeUrl + '" alt="' + safeAlt + '">';
+                    formats.markdown = '![' + safeAlt + '](' + safeUrl + ')';
+                    formats.bbcode = '[img]' + safeUrl + '[/img]';
+                }
+                var item = el('div', 'response-item response-success');
+                var head = el('div', 'resp-head');
+                var badge = el('span', 'resp-icon');
+                badge.appendChild(icon(CHECK_ICON, 12));
+                head.appendChild(badge);
+                head.appendChild(el('span', 'resp-title', isImage ? '上传成功 · 图片外链' : '上传成功 · 文件外链'));
+                item.appendChild(head);
+                var link = el('a', 'resp-link', url);
+                link.href = url;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                link.title = url;
+                item.appendChild(link);
+                var actions = el('div', 'resp-actions');
+                var defs = [{ key: 'link', label: '复制链接' }];
+                if (isImage) {
+                    defs.push({ key: 'html', label: 'HTML' });
+                    defs.push({ key: 'markdown', label: 'Markdown' });
+                    defs.push({ key: 'bbcode', label: 'BBCode' });
+                }
+                defs.forEach(function (def) {
+                    var chip = el('button', 'chip', def.label);
+                    chip.type = 'button';
+                    chip.addEventListener('click', function () {
+                        copyText(formats[def.key]).then(function () {
+                            flashChip(chip, '已复制');
+                        }, function () {
+                            flashChip(chip, '复制失败');
                         });
-                        return e.message;
-                    },
-                    error: function () {
-                        var errorResponse = $('<div class="response-item response-error">上传失败</div>');
-                        $("#response").prepend(errorResponse);
-                        reject("上传失败");
-                    },
-                    complete: function () {
-                        $("#uploadButton").prop("disabled", !1);
-                        $("#uploadButton").text("上传");
-                        $("#loading").hide();
+                    });
+                    actions.appendChild(chip);
+                });
+                item.appendChild(actions);
+                responseEl.insertBefore(item, responseEl.firstChild);
+            }
+
+            function showError(error, fileName) {
+                if (!responseEl) return;
+                var message = messageOf(error);
+                var item = el('div', 'response-item response-error');
+                var head = el('div', 'resp-head');
+                var badge = el('span', 'resp-icon');
+                badge.appendChild(icon(ALERT_ICON, 13));
+                head.appendChild(badge);
+                head.appendChild(el('span', 'resp-title', fileName ? '上传失败 · ' + fileName : '上传失败'));
+                item.appendChild(head);
+                item.appendChild(el('p', 'resp-desc', message));
+                responseEl.insertBefore(item, responseEl.firstChild);
+            }
+
+            function messageOf(error) {
+                if (error && error.message) return String(error.message);
+                return '上传失败，请稍后重试';
+            }
+
+            function legacyCopy(text) {
+                return new Promise(function (resolve, reject) {
+                    var area = document.createElement('textarea');
+                    area.value = text;
+                    area.setAttribute('readonly', 'readonly');
+                    area.style.position = 'fixed';
+                    area.style.top = '-1000px';
+                    area.style.left = '0';
+                    area.style.opacity = '0';
+                    document.body.appendChild(area);
+                    area.select();
+                    area.setSelectionRange(0, text.length);
+                    var copied = false;
+                    try {
+                        copied = document.execCommand('copy');
+                    } catch (error) {
+                        copied = false;
+                    }
+                    document.body.removeChild(area);
+                    if (copied) resolve();
+                    else reject(new Error('复制失败'));
+                });
+            }
+
+            function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text).catch(function () {
+                        return legacyCopy(text);
+                    });
+                }
+                return legacyCopy(text);
+            }
+
+            function flashChip(button, text) {
+                if (!button) return;
+                if (!button.dataset.label) button.dataset.label = button.textContent;
+                button.textContent = text;
+                button.classList.add('is-copied');
+                clearTimeout(chipTimers.get(button));
+                chipTimers.set(button, setTimeout(function () {
+                    button.textContent = button.dataset.label;
+                    button.classList.remove('is-copied');
+                }, 1500));
+            }
+
+            function loadHistory() {
+                try {
+                    var raw = window.localStorage.getItem(HISTORY_KEY);
+                    if (!raw) return [];
+                    var rows = JSON.parse(raw);
+                    if (!Array.isArray(rows)) return [];
+                    return rows.filter(function (row) {
+                        return row && row.name && row.url;
+                    });
+                } catch (error) {
+                    return [];
+                }
+            }
+
+            function saveHistory(rows) {
+                try {
+                    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(rows));
+                } catch (error) {
+                    /* 忽略隐私模式或配额限制导致的写入失败 */
+                }
+            }
+
+            function timeLabel(time) {
+                var date = new Date(time || Date.now());
+                if (isNaN(date.getTime())) return '';
+                var now = new Date();
+                var month = String(date.getMonth() + 1).padStart(2, '0');
+                var day = String(date.getDate()).padStart(2, '0');
+                var hours = String(date.getHours()).padStart(2, '0');
+                var minutes = String(date.getMinutes()).padStart(2, '0');
+                var prefix = date.getFullYear() === now.getFullYear() ? '' : date.getFullYear() + '-';
+                return prefix + month + '-' + day + ' ' + hours + ':' + minutes;
+            }
+
+            function addHistory(name, url) {
+                var fullUrl = toFullUrl(url);
+                if (!fullUrl) return;
+                var rows = loadHistory().filter(function (row) {
+                    return !(row.name === name && row.url === fullUrl);
+                });
+                rows.unshift({ name: name, url: fullUrl, time: Date.now() });
+                if (rows.length > HISTORY_MAX) rows = rows.slice(0, HISTORY_MAX);
+                saveHistory(rows);
+                renderHistory();
+            }
+
+            function renderHistory() {
+                if (!historyEl || !historyListEl) return;
+                var rows = loadHistory();
+                historyListEl.textContent = '';
+                if (historyCountEl) historyCountEl.textContent = String(rows.length);
+                if (!rows.length) {
+                    historyEl.hidden = true;
+                    return;
+                }
+                historyEl.hidden = false;
+                rows.forEach(function (row) {
+                    var li = el('li');
+                    var name = el('span', 'history-name', row.name);
+                    name.title = row.name;
+                    var url = el('span', 'history-url', row.url.replace(/^https?:\/\/[^/]+/i, ''));
+                    url.title = row.url;
+                    var time = el('span', 'history-time', timeLabel(row.time));
+                    var copy = el('button', 'history-copy');
+                    copy.type = 'button';
+                    copy.title = '复制链接';
+                    copy.setAttribute('aria-label', '复制 ' + row.name + ' 的链接');
+                    copy.appendChild(icon(COPY_ICON, 13));
+                    copy.addEventListener('click', function () {
+                        if (copy.classList.contains('is-copied')) return;
+                        copyText(row.url).then(function () {
+                            copy.classList.add('is-copied');
+                            copy.textContent = '';
+                            copy.appendChild(icon(CHECK_ICON, 13));
+                            setTimeout(function () {
+                                copy.classList.remove('is-copied');
+                                copy.textContent = '';
+                                copy.appendChild(icon(COPY_ICON, 13));
+                            }, 1500);
+                        }, function () {
+                            copy.title = '复制失败';
+                        });
+                    });
+                    li.appendChild(name);
+                    li.appendChild(url);
+                    li.appendChild(time);
+                    li.appendChild(copy);
+                    historyListEl.appendChild(li);
+                });
+            }
+
+            function initUploader() {
+                if (!fileInput || !dropzone || !uploadButton) return;
+
+                fileInput.addEventListener('change', function () {
+                    takeFiles(fileInput.files);
+                });
+
+                uploadButton.addEventListener('click', function () {
+                    if (busy) return;
+                    if (!selected.length) {
+                        fileInput.click();
+                        return;
+                    }
+                    uploadSelected();
+                });
+
+                ['dragenter', 'dragover'].forEach(function (type) {
+                    dropzone.addEventListener(type, function (event) {
+                        event.preventDefault();
+                        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+                        dropzone.classList.add('is-dragover');
+                    });
+                });
+
+                dropzone.addEventListener('dragleave', function (event) {
+                    if (event.relatedTarget && dropzone.contains(event.relatedTarget)) return;
+                    dropzone.classList.remove('is-dragover');
+                });
+
+                dropzone.addEventListener('drop', function (event) {
+                    event.preventDefault();
+                    dropzone.classList.remove('is-dragover');
+                    if (!event.dataTransfer) return;
+                    if (takeFiles(event.dataTransfer.files)) uploadSelected();
+                });
+
+                dropzone.addEventListener('keydown', function (event) {
+                    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+                    event.preventDefault();
+                    fileInput.click();
+                });
+
+                document.addEventListener('dragover', function (event) {
+                    if (!event.dataTransfer || !event.dataTransfer.types) return;
+                    if (Array.prototype.indexOf.call(event.dataTransfer.types, 'Files') !== -1) {
+                        event.preventDefault();
                     }
                 });
-        });
-    }
-    function readAndUploadFile(file) {
-        var reader = new FileReader();
-        reader.onload = function (e) {
-            // e.target.result 包含读取的文件内容
-            var fileContent = e.target.result;
-            // 调用上传文件的函数
-            uploadFile(file, fileContent);
-        };
-        // 以文本形式读取文件内容
-        reader.readAsText(file);
-    }
-    document.addEventListener("paste", function (e) {
-        for (var o = e.clipboardData.items, t = 0; t < o.length; t++) {
-            var a,
-                n = o[t];
-            -1 !== n.type.indexOf("image") &&
-                ((a = n.getAsFile()),
-                    $("#uploadFileLabel")
-                        .text("已选择剪贴板文件")
-                        .css("background-color", "#0056b3"),
-                    uploadFile(a));
-        }
-    }),
-        $(document).ready(function () {
-            $("#uploadFile").change(function () {
-                var files = $(this)[0].files;
-                if (files.length > 0) {
-                    if (files.length === 1) {
-                        $("#uploadFileLabel")
-                            .text("已选择文件: " + files[0].name)
-                            .css("background-color", "#0056b3");
-                    } else {
-                        $("#uploadFileLabel")
-                            .text("已选择多个文件")
-                            .css("background-color", "#0056b3");
+
+                document.addEventListener('drop', function (event) {
+                    if (!dropzone.contains(event.target)) event.preventDefault();
+                });
+
+                document.addEventListener('paste', function (event) {
+                    if (!event.clipboardData) return;
+                    var items = event.clipboardData.items || [];
+                    var files = [];
+                    for (var i = 0; i < items.length; i += 1) {
+                        var item = items[i];
+                        if (item.kind !== 'file' || !item.type || item.type.indexOf('image/') !== 0) continue;
+                        var file = item.getAsFile();
+                        if (file) files.push(file);
                     }
-                } else {
-                    $("#uploadFileLabel")
-                        .text("选择文件")
-                        .css("background-color", "#007BFF");
-                }
-            });
-            $("#uploadButton").click(function () {
-                var input = document.getElementById("uploadFile");
-                if (input.files.length > 0) {
-                    for (var i = 0; i < input.files.length; i++) {
-                        readAndUploadFile(input.files[i]);
-                    }
-                } else {
-                    alert("请选择一个文件");
-                }
-            });
-        });
-    var HISTORY_KEY = "tgstate_history";
-    var HISTORY_MAX = 50;
+                    if (!files.length) return;
+                    event.preventDefault();
+                    if (takeFiles(files)) uploadSelected();
+                });
+            }
 
-    function toFullUrl(path) {
-        if (!path) {
-            return "";
-        }
-        return /^https?:\/\//i.test(path) ? path : window.location.origin + path;
-    }
-
-    function loadHistory() {
-        try {
-            var list = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
-            return Array.isArray(list) ? list : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function addHistory(name, url) {
-        if (!url) {
-            return;
-        }
-        var list = loadHistory();
-        list.unshift({ name: name, url: url, time: Date.now() });
-        try {
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX)));
-        } catch (e) {
-            return;
-        }
-        renderHistory();
-    }
-
-    function renderHistory() {
-        var box = document.getElementById("history");
-        var listEl = document.getElementById("history-list");
-        if (!box || !listEl) {
-            return;
-        }
-        var list = loadHistory();
-        listEl.textContent = "";
-        if (list.length === 0) {
-            box.style.display = "none";
-            return;
-        }
-        box.style.display = "";
-        for (var i = 0; i < list.length; i++) {
-            var item = list[i] || {};
-            var url = toFullUrl(item.url);
-            var li = document.createElement("li");
-            var a = document.createElement("a");
-            a.className = "history-name";
-            a.href = url;
-            a.target = "_blank";
-            a.rel = "noopener";
-            a.textContent = item.name || url;
-            var span = document.createElement("span");
-            span.className = "history-url";
-            span.textContent = url;
-            li.appendChild(a);
-            li.appendChild(span);
-            listEl.appendChild(li);
-        }
-    }
-
-    $(document).ready(renderHistory);
-</script>
-<details id="history" style="display: none">
-    <summary>历史上传记录</summary>
-    <ul id="history-list"></ul>
-</details>
-<a target="_blank" href="https://github.com/csznet/tgState"><svg version="1.1" id="Layer_1"
-        xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="44px"
-        height="15px" viewBox="0 0 44 15" enable-background="new 0 0 44 15" xml:space="preserve">
-        <image id="image0" width="44" height="15" x="0" y="0" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAPBAMAAABtkjCqAAAABGdBTUEAALGPC/xhBQAAACBjSFJN
-AAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAKlBMVEUAAAD/////ZgCZmWb/
-aAT/+vj/agj//fz8/Pr9/f36+vj/+PT/ZwOammiamlTzAAAAAWJLR0QB/wIt3gAAAAlwSFlzAAAL
-EwAACxMBAJqcGAAAAAd0SU1FB+cKAw8uKd154KgAAABtSURBVBjTY2DADhgFsQABBkYlOBA2hgHS
-hR1FlRIFiwQFhYQtjC0sBScvFAQLB6kFBQHVaisJW062sACqbYYIKwFVK+kEKQlbXLxhKQgXVgNK
-BKkCzbYw7kSoVhRVEhRUQpgNFaaGu7GHCXYAAPxWLJi8tpSVAAAAJXRFWHRkYXRlOmNyZWF0ZQAy
-MDIzLTEwLTAzVDE1OjQ2OjQxKzAwOjAwZpEQ6AAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyMy0xMC0w
-M1QxNTo0Njo0MSswMDowMBfMqFQAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjMtMTAtMDNUMTU6
-NDY6NDErMDA6MDBA2YmLAAAAAElFTkSuQmCC" />
-    </svg></a>
+            initUploader();
+            renderHistory();
+        })();
+    </script>
 </body>
-
 </html>
 {{end}}

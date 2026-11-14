@@ -1,6 +1,56 @@
 {{template "public/header" .}}
-    <h1>上传文件到 Telegram</h1><label for="uploadFile" id="uploadFileLabel" class="custom-file-label">选择文件</label> <input
-        type="file" name="image" id="uploadFile" class="custom-file-input" multiple> <button id="uploadButton">上传</button>
-    <div id="loading">上传中...</div>
-    <div id="response" class="ui-widget"></div>
+        <section class="hero">
+            <div class="wrap">
+                <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Telegram 驱动的无服务器存储</p>
+                <h1>上传文件到 Telegram</h1>
+                <p class="sub">文件直接存入你的 Telegram 频道，返回永久外链。不限格式与大小，不占用服务器磁盘。</p>
+            </div>
+        </section>
+        <section class="work">
+            <div class="wrap">
+                <div class="composer">
+                    <label class="dropzone" id="uploadFileLabel" for="uploadFile" tabindex="0">
+                        <span class="dz-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2" />
+                                <path d="M12 12v9" />
+                                <path d="m8 16 4-4 4 4" />
+                            </svg>
+                        </span>
+                        <span class="dz-title" id="uploadFileName">点击选择文件，或拖到这里</span>
+                        <span class="dz-hint">支持任意格式 · 超过 10 MB 自动分片上传</span>
+                    </label>
+                    <input type="file" name="image" id="uploadFile" class="visually-hidden" multiple />
+                    <div class="composer-bar">
+                        <span class="composer-meta" id="uploadMeta">尚未选择文件</span>
+                        <button id="uploadButton" class="send-btn" type="button" aria-label="上传文件" title="上传文件">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m5 12 7-7 7 7" />
+                                <path d="M12 19V5" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="loading" class="status" hidden>
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span id="loadingText">正在上传…</span>
+                </div>
+                <div id="response" class="response-list" aria-live="polite"></div>
+                <details id="history" class="history" hidden>
+                    <summary>
+                        <span>历史上传记录</span>
+                        <span id="history-count" class="count">0</span>
+                        <span class="chev" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </span>
+                    </summary>
+                    <ul id="history-list"></ul>
+                </details>
+            </div>
+        </section>
 {{template "public/footer" .}}
