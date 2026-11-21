@@ -42,6 +42,7 @@ Optional parameters:
 
 - pass
 - mode
+- codes
 - url
 - port
 
@@ -76,6 +77,29 @@ The web page allows at most 10 uploads per browser per calendar day by default. 
 The quota is stored in the browser's localStorage (key `tgstate_quota`), so clearing browser data, using a private window, or switching browsers resets it. This is a client-side guard: it deters mistakes and casual abuse but cannot stop a determined bypass.
 
 To change the limit, edit `dailyLimit` (a positive integer) in the `tgstate-page-config` block of `assets/templates/files.tmpl` and `assets/templates/images.tmpl`.
+
+## Redeem codes (codes)
+
+Configure redeem codes with the `codes` environment variable. On the page, open "有兑换码？可增加上传次数" and enter a code to add uploads for that browser or unlock unlimited uploads.
+
+Format: `code:reward`, multiple codes separated by commas.
+
+- A positive integer reward adds uploads (extra uploads are kept across calendar days and used after the daily quota).
+- `unlimited` (also `u`, `inf`, `∞`) unlocks unlimited uploads for that browser.
+
+Example:
+
+```
+codes=WELCOME10:10,VIP:unlimited
+```
+
+For Docker, add `-e codes=WELCOME10:10,VIP:unlimited`; for Vercel, add the `codes` environment variable to the project.
+
+Notes:
+
+- Codes are case-insensitive. The server only validates a code; it does not track usage (this project has no database).
+- The same code can be redeemed only once per browser, but it can be redeemed again in other browsers/devices or after clearing site data. Codes therefore suit gift/invite codes, not one-time paid codes; use long random strings to avoid enumeration.
+- The redeemed reward is stored in localStorage (key `tgstate_quota`) as well; it is a client-side guard that can be bypassed on purpose.
 
 ## url
 

@@ -19,6 +19,7 @@ func Vercel(w http.ResponseWriter, r *http.Request) {
 		conf.Mode = "i"
 	}
 	conf.BaseUrl = os.Getenv("url")
+	conf.Codes = os.Getenv("codes")
 	// 获取请求路径
 	path := r.URL.Path
 	// 如果请求路径以 "/img/" 开头
@@ -30,6 +31,9 @@ func Vercel(w http.ResponseWriter, r *http.Request) {
 	case "/api":
 		// 调用 control 包中的 UploadImageAPI 处理函数
 		control.Middleware(control.UploadImageAPI)(w, r)
+	case "/redeem":
+		// 兑换码校验
+		control.Middleware(control.Redeem)(w, r)
 	case "/pwd":
 		control.Pwd(w, r)
 	default:

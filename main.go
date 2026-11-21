@@ -32,6 +32,7 @@ func web() {
 			http.HandleFunc("/pwd", control.Pwd)
 		}
 		http.HandleFunc("/api", control.Middleware(control.UploadImageAPI))
+		http.HandleFunc("/redeem", control.Middleware(control.Redeem))
 		http.HandleFunc("/", control.Middleware(control.Index))
 	}
 
@@ -52,6 +53,7 @@ func init() {
 	flag.StringVar(&conf.ChannelName, "target", os.Getenv("target"), "Channel Name or ID")
 	flag.StringVar(&conf.Pass, "pass", os.Getenv("pass"), "Visit Password")
 	flag.StringVar(&conf.Mode, "mode", os.Getenv("mode"), "Run mode")
+	flag.StringVar(&conf.Codes, "codes", os.Getenv("codes"), "Redeem Codes")
 	flag.StringVar(&conf.BaseUrl, "url", os.Getenv("url"), "Base Url")
 	flag.Parse()
 	if conf.Mode == "m" {

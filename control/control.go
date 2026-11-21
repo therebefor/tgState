@@ -272,6 +272,70 @@ func Pwd(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// redeemReward 表示一个兑换码对应的奖励
+type redeemReward struct {
+	extra     int
+	unlimited bool
+}
+
+// parseRedeemCodes 解析环境变量 codes：
+// 多个兑换码用英文逗号分隔，单个格式为“兑换码:奖励”，
+// 奖励为正整数（额外上传次数）或 unlimited/u/inf/∞（不限次数）。
+func parseRedeemCodes(raw string) map[string]redeemReward {
+	codes := make(map[string]redeemReward)
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		parts := strings.SplitN(item, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		value := strings.ToLower(strings.TrimSpace(parts[1]))
+		if key == "" {
+			continue
+		}
+		if value == "unlimited" || value == "u" || value == "inf" || value == "∞" {
+			codes[key] = redeemReward{unlimited: true}
+			continue
+		}
+		amount, err := strconv.Atoi(value)
+		if err != nil || amount <= 0 {
+			continue
+		}
+		codes[key] = redeemReward{extra: amount}
+	}
+	return codes
+}
+
+// Redeem 校验兑换码并返回奖励。
+// 服务端无状态：奖励由前端记录，兑换码本身不做使用次数记录。
+func Redeem(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method != http.MethodPost {
+		http.Error(w, "请求方法不支持，请使用 POST", http.StatusMethodNotAllowed)
+		return
+	}
+	code := strings.ToLower(strings.TrimSpace(r.FormValue("code")))
+	res := conf.RedeemResponse{Code: 0, Message: "兑换码无效，请检查后重试"}
+	if strings.TrimSpace(conf.Codes) == "" {
+		res.Message = "未开启兑换码功能"
+	} else if code == "" {
+		res.Message = "请输入兑换码"
+	} else if reward, ok := parseRedeemCodes(conf.Codes)[code]; ok {
+		if reward.unlimited {
+			res = conf.RedeemResponse{Code: 1, Message: "兑换成功", Unlimited: true}
+		} else {
+			res = conf.RedeemResponse{Code: 1, Message: "兑换成功", Extra: reward.extra}
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
+}
+
 func Middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// 只有当密码设置并且不为"none"时，才进行检查

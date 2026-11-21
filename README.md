@@ -42,6 +42,7 @@ https://tgstate.vercel.app
 
  - pass
  - mode
+ - codes
  - url
  - port
 
@@ -76,6 +77,29 @@ https://tgstate.vercel.app
 额度记录在浏览器的 localStorage 中（键名 `tgstate_quota`），因此清理浏览器数据、使用无痕窗口或更换浏览器都会重新计算；这是前端防护，可挡住误用与普通滥用，但无法阻止有意绕过。
 
 如需调整数量，修改 `assets/templates/files.tmpl` 与 `assets/templates/images.tmpl` 中 `tgstate-page-config` 的 `dailyLimit` 值（正整数）即可。
+
+## 兑换码（codes）
+
+通过环境变量 `codes` 配置兑换码，网页上展开「有兑换码？可增加上传次数」输入兑换码，即可为该浏览器增加上传次数，或解锁不限次数。
+
+格式为 `兑换码:奖励`，多个兑换码用英文逗号分隔：
+
+ - 奖励为正整数时，代表增加的上传次数（额外次数跨自然日保留，优先消耗每日额度）
+ - 奖励为 `unlimited`（也可写 `u`、`inf`、`∞`）时，代表该浏览器不限上传次数
+
+示例：
+
+```
+codes=WELCOME10:10,VIP:unlimited
+```
+
+Docker 部署时追加 `-e codes=WELCOME10:10,VIP:unlimited`；Vercel 部署则在项目环境变量中添加 `codes`。
+
+说明：
+
+ - 兑换码大小写不敏感，服务端只校验码是否有效，不记录使用次数（本项目无数据库）
+ - 同一兑换码在同一浏览器只能兑换一次；但可在其他浏览器/设备重复兑换，清除站点数据后也可再次兑换。因此兑换码适合做福利码、邀请码，不适合一次性付费码；建议使用较长的随机字符串避免被枚举
+ - 兑换结果同样保存在 localStorage（键名 `tgstate_quota`），属于前端防护，可被有意绕过
 
 ## url
 

@@ -399,6 +399,11 @@
             color: var(--danger);
         }
 
+        .composer-quota.is-unlimited {
+            color: var(--brand-strong);
+            font-weight: 500;
+        }
+
         .send-btn {
             position: relative;
             display: grid;
@@ -764,6 +769,113 @@
 
         .history-copy.is-copied {
             color: var(--brand);
+        }
+
+        /* ---------- redeem ---------- */
+        .redeem {
+            margin-top: 14px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: var(--glass);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .redeem {
+                background: rgba(23, 30, 41, .5);
+            }
+        }
+
+        .redeem summary {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 15px 18px;
+            color: var(--ink-strong);
+            font-size: 14px;
+            font-weight: 600;
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .redeem summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .redeem[open] .chev {
+            transform: rotate(180deg);
+        }
+
+        .redeem-form {
+            display: flex;
+            gap: 10px;
+            padding: 0 18px 4px;
+        }
+
+        .redeem-input {
+            flex: 1 1 auto;
+            min-width: 0;
+            height: 42px;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-field);
+            background: var(--bg);
+            color: var(--ink);
+            font-family: inherit;
+            font-size: 14px;
+            letter-spacing: .02em;
+            outline: none;
+            transition: border-color .16s ease, box-shadow .16s ease;
+        }
+
+        .redeem-input::placeholder {
+            color: var(--faint);
+        }
+
+        .redeem-input:focus {
+            border-color: var(--brand-line);
+            box-shadow: 0 0 0 3px var(--brand-soft);
+        }
+
+        .redeem-button {
+            flex: none;
+            height: 42px;
+            padding: 0 20px;
+            border: 0;
+            border-radius: var(--radius-pill);
+            background: var(--brand);
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color .16s ease, opacity .16s ease;
+        }
+
+        .redeem-button:hover {
+            background: var(--brand-strong);
+        }
+
+        .redeem-button:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
+        .redeem-status {
+            margin: 0;
+            padding: 8px 18px 14px;
+            color: var(--faint);
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+
+        .redeem-status.is-error {
+            color: var(--danger);
+        }
+
+        .redeem-status.is-success {
+            color: var(--brand-strong);
         }
 
         /* ---------- footer ---------- */

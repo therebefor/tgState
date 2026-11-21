@@ -59,6 +59,10 @@
             var historyListEl = document.getElementById('history-list');
             var historyCountEl = document.getElementById('history-count');
             var quotaHintEl = document.getElementById('quotaHint');
+            var redeemFormEl = document.getElementById('redeemForm');
+            var redeemInputEl = document.getElementById('redeemInput');
+            var redeemButtonEl = document.getElementById('redeemButton');
+            var redeemStatusEl = document.getElementById('redeemStatus');
             var progressEl = document.getElementById('progress');
             var progressFillEl = document.getElementById('progressFill');
             var loadingPercentEl = document.getElementById('loadingPercent');
@@ -111,6 +115,7 @@
 
             // ---- 每日上传额度（防滥用）：每个浏览器一个自然日最多 N 个文件/图片 ----
             var QUOTA_KEY = 'tgstate_quota';
+            var REDEEM_CODES_MAX = 20;
 
             function pad2(number) {
                 return (number < 10 ? '0' : '') + number;
@@ -121,14 +126,33 @@
                 return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
             }
 
+            function normalizeQuotaCode(value) {
+                return String(value === undefined || value === null ? '' : value).trim().toLowerCase();
+            }
+
             function loadQuota() {
-                var row = { date: todayStr(), used: 0 };
+                var row = { date: todayStr(), used: 0, bonus: 0, unlimited: false, codes: [] };
                 try {
                     var raw = window.localStorage.getItem(QUOTA_KEY);
                     var saved = raw ? JSON.parse(raw) : null;
-                    if (saved && saved.date === row.date) {
+                    if (!saved || typeof saved !== 'object') return row;
+                    var bonus = Number(saved.bonus);
+                    if (isFinite(bonus) && bonus > 0) row.bonus = Math.floor(bonus);
+                    row.unlimited = saved.unlimited === true;
+                    if (Array.isArray(saved.codes)) {
+                        var seen = {};
+                        for (var i = 0; i < saved.codes.length && row.codes.length < REDEEM_CODES_MAX; i += 1) {
+                            var savedCode = normalizeQuotaCode(saved.codes[i]);
+                            if (!savedCode || seen[savedCode]) continue;
+                            seen[savedCode] = true;
+                            row.codes.push(savedCode);
+                        }
+                    }
+                    if (saved.date === row.date) {
                         var used = Number(saved.used);
-                        if (isFinite(used) && used >= 0) row.used = Math.min(Math.floor(used), PAGE_CONFIG.dailyLimit);
+                        if (isFinite(used) && used >= 0) {
+                            row.used = Math.min(Math.floor(used), PAGE_CONFIG.dailyLimit);
+                        }
                     }
                 } catch (error) {
                     // localStorage 不可用时视为未使用
@@ -145,23 +169,143 @@
             }
 
             function quotaLeft() {
-                return Math.max(0, PAGE_CONFIG.dailyLimit - loadQuota().used);
+                var row = loadQuota();
+                if (row.unlimited) return Infinity;
+                return Math.max(0, PAGE_CONFIG.dailyLimit - row.used) + row.bonus;
             }
 
             function refreshQuotaHint() {
                 if (!quotaHintEl) return;
-                var left = quotaLeft();
+                var row = loadQuota();
+                quotaHintEl.classList.remove('is-empty', 'is-unlimited');
+                if (row.unlimited) {
+                    quotaHintEl.textContent = '不限上传次数';
+                    quotaHintEl.title = '已兑换不限上传次数，当前浏览器不再受每日额度限制';
+                    quotaHintEl.classList.add('is-unlimited');
+                    return;
+                }
+                var left = Math.max(0, PAGE_CONFIG.dailyLimit - row.used) + row.bonus;
                 quotaHintEl.textContent = left > 0 ? '今日剩余 ' + left + ' 次' : '今日次数已用完';
-                quotaHintEl.title = '每个浏览器每天最多上传 ' + PAGE_CONFIG.dailyLimit + ' 个文件/图片，次日自动重置';
-                if (left > 0) quotaHintEl.classList.remove('is-empty');
-                else quotaHintEl.classList.add('is-empty');
+                quotaHintEl.title = '每个浏览器每天最多上传 ' + PAGE_CONFIG.dailyLimit + ' 个文件/图片' +
+                    (row.bonus > 0 ? '，另有兑换额度 ' + row.bonus + ' 次' : '') + '，次日自动重置';
+                if (left <= 0) quotaHintEl.classList.add('is-empty');
             }
 
             function consumeQuota() {
                 var row = loadQuota();
-                row.used += 1;
+                if (row.used < PAGE_CONFIG.dailyLimit) row.used += 1;
+                else if (row.bonus > 0) row.bonus -= 1;
                 saveQuota(row);
                 refreshQuotaHint();
+            }
+
+            // ---- 兑换码：输入兑换码可增加上传次数或不限次数 ----
+            function setRedeemStatus(text, state) {
+                if (!redeemStatusEl) return;
+                redeemStatusEl.textContent = text || '';
+                redeemStatusEl.classList.remove('is-error', 'is-success');
+                if (state === 'error') redeemStatusEl.classList.add('is-error');
+                else if (state === 'success') redeemStatusEl.classList.add('is-success');
+            }
+
+            function redeemRequest(code) {
+                return new Promise(function (resolve, reject) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/redeem', true);
+                    xhr.withCredentials = true;
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.onload = function () {
+                        if (xhr.status === 401 || xhr.status === 403) {
+                            reject(new Error('没有访问权限，请刷新页面后重新验证'));
+                            return;
+                        }
+                        if (xhr.status < 200 || xhr.status >= 300) {
+                            reject(new Error('服务器返回 HTTP ' + xhr.status));
+                            return;
+                        }
+                        var data;
+                        try {
+                            data = JSON.parse(xhr.responseText || '{}');
+                        } catch (error) {
+                            reject(new Error('服务器返回数据无法解析，请稍后重试'));
+                            return;
+                        }
+                        if (!data || data.code !== 1) {
+                            reject(new Error((data && data.message) || '兑换失败，请稍后重试'));
+                            return;
+                        }
+                        resolve(data);
+                    };
+                    xhr.onerror = function () {
+                        reject(new Error('网络连接失败，请检查网络后重试'));
+                    };
+                    xhr.ontimeout = function () {
+                        reject(new Error('请求超时，请稍后重试'));
+                    };
+                    var body = new FormData();
+                    body.append('code', code);
+                    xhr.send(body);
+                });
+            }
+
+            function redeemBusy(state) {
+                if (redeemButtonEl) redeemButtonEl.disabled = !!state;
+            }
+
+            function handleRedeem(event) {
+                if (event) event.preventDefault();
+                if (!redeemInputEl) return;
+                var code = String(redeemInputEl.value || '').trim();
+                if (!code) {
+                    setRedeemStatus('请输入兑换码', 'error');
+                    redeemInputEl.focus();
+                    return;
+                }
+                var row = loadQuota();
+                if (row.unlimited) {
+                    setRedeemStatus('当前已是不限上传次数', 'success');
+                    return;
+                }
+                var normalized = normalizeQuotaCode(code);
+                for (var i = 0; i < row.codes.length; i += 1) {
+                    if (row.codes[i] === normalized) {
+                        setRedeemStatus('该兑换码已在本浏览器兑换过', 'error');
+                        return;
+                    }
+                }
+                redeemBusy(true);
+                setRedeemStatus('正在兑换…', '');
+                redeemRequest(code).then(function (data) {
+                    var quota = loadQuota();
+                    if (data.unlimited) {
+                        quota.unlimited = true;
+                    } else {
+                        var extra = Math.floor(Number(data.extra) || 0);
+                        if (extra > 0) quota.bonus += extra;
+                    }
+                    if (normalized && quota.codes.indexOf(normalized) === -1) {
+                        quota.codes.unshift(normalized);
+                        if (quota.codes.length > REDEEM_CODES_MAX) quota.codes.length = REDEEM_CODES_MAX;
+                    }
+                    saveQuota(quota);
+                    refreshQuotaHint();
+                    redeemInputEl.value = '';
+                    if (data.unlimited) {
+                        setRedeemStatus('兑换成功，已解锁不限上传次数', 'success');
+                    } else {
+                        var added = Math.floor(Number(data.extra) || 0);
+                        setRedeemStatus(added > 0 ? '兑换成功，额度 +' + added + ' 次' : (data.message || '兑换成功'), 'success');
+                    }
+                }).catch(function (error) {
+                    setRedeemStatus(messageOf(error), 'error');
+                }).then(function () {
+                    redeemBusy(false);
+                });
+            }
+
+            function initRedeem() {
+                if (!redeemFormEl) return;
+                redeemFormEl.addEventListener('submit', handleRedeem);
             }
 
             function toFullUrl(path) {
@@ -617,6 +761,7 @@
             }
 
             initUploader();
+            initRedeem();
             renderHistory();
             refreshQuotaHint();
         })();
