@@ -59,6 +59,9 @@
             var historyListEl = document.getElementById('history-list');
             var historyCountEl = document.getElementById('history-count');
             var quotaHintEl = document.getElementById('quotaHint');
+            var progressEl = document.getElementById('progress');
+            var progressFillEl = document.getElementById('progressFill');
+            var loadingPercentEl = document.getElementById('loadingPercent');
 
             var defaultName = nameEl ? nameEl.textContent : '';
             var defaultMeta = metaEl ? metaEl.textContent : '';
@@ -181,11 +184,20 @@
                 if (loadingTextEl) loadingTextEl.textContent = text || DEFAULT_LOADING_TEXT;
             }
 
+            function setProgress(ratio) {
+                var value = Math.max(0, Math.min(1, Number(ratio) || 0));
+                var percent = Math.round(value * 100);
+                if (progressFillEl) progressFillEl.style.width = percent + '%';
+                if (progressEl) progressEl.setAttribute('aria-valuenow', String(percent));
+                if (loadingPercentEl) loadingPercentEl.textContent = percent + '%';
+            }
+
             function setBusy(state) {
                 busy = !!state;
                 if (uploadButton) uploadButton.disabled = busy;
                 if (loadingEl) loadingEl.hidden = !busy;
                 setLoading(DEFAULT_LOADING_TEXT);
+                if (busy) setProgress(0);
             }
 
             function updateSelection() {
@@ -223,51 +235,78 @@
                 return true;
             }
 
-            function uploadRequest(blob, filename) {
-                var form = new FormData();
-                if (filename) form.append('image', blob, filename);
-                else form.append('image', blob);
-                return fetch(API_ENDPOINT, {
-                    method: 'POST',
-                    body: form,
-                    credentials: 'same-origin',
-                    cache: 'no-store'
-                }).then(function (response) {
-                    if (response.status === 401 || response.status === 403) {
-                        throw new Error('没有访问权限，请刷新页面后重新验证');
+            function uploadRequest(blob, filename, onProgress) {
+                return new Promise(function (resolve, reject) {
+                    var form = new FormData();
+                    if (filename) form.append('image', blob, filename);
+                    else form.append('image', blob);
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', API_ENDPOINT, true);
+                    xhr.withCredentials = true;
+                    if (xhr.upload && typeof onProgress === 'function') {
+                        xhr.upload.onprogress = function (event) {
+                            if (event && event.lengthComputable && event.total > 0) {
+                                onProgress(Math.min(event.loaded / event.total, 1));
+                            }
+                        };
                     }
-                    if (!response.ok) {
-                        throw new Error('服务器返回 HTTP ' + response.status);
-                    }
-                    return response.json();
-                }).then(function (data) {
-                    if (!data || data.code !== 1) {
-                        var message = data && (data.message || data.msg);
-                        throw new Error(message ? String(message) : '上传失败，请稍后重试');
-                    }
-                    return data;
+                    xhr.onload = function () {
+                        if (xhr.status === 401 || xhr.status === 403) {
+                            reject(new Error('没有访问权限，请刷新页面后重新验证'));
+                            return;
+                        }
+                        if (xhr.status < 200 || xhr.status >= 300) {
+                            reject(new Error('服务器返回 HTTP ' + xhr.status));
+                            return;
+                        }
+                        var data;
+                        try {
+                            data = JSON.parse(xhr.responseText || '');
+                        } catch (error) {
+                            reject(new Error('服务器返回数据无法解析，请稍后重试'));
+                            return;
+                        }
+                        if (!data || data.code !== 1) {
+                            var message = data && (data.message || data.msg);
+                            reject(new Error(message ? String(message) : '上传失败，请稍后重试'));
+                            return;
+                        }
+                        resolve(data);
+                    };
+                    xhr.onerror = function () {
+                        reject(new Error('网络连接失败，请检查网络后重试'));
+                    };
+                    xhr.ontimeout = function () {
+                        reject(new Error('上传超时，请稍后重试'));
+                    };
+                    xhr.onabort = function () {
+                        reject(new Error('上传已取消'));
+                    };
+                    xhr.send(form);
                 });
             }
 
             async function uploadFile(file, onProgress) {
+                var report = typeof onProgress === 'function' ? onProgress : function () {};
                 if (file.size <= PAGE_CONFIG.chunkSize) {
-                    var single = await uploadRequest(file, file.name);
+                    var single = await uploadRequest(file, file.name, report);
+                    report(1);
                     return { name: file.name, link: single.message };
                 }
-                var totalParts = Math.ceil(file.size / PAGE_CONFIG.chunkSize);
                 var index = 'tgstate-blob\n' + file.name + '\nsize' + file.size;
                 var offset = 0;
-                var part = 0;
                 while (offset < file.size) {
-                    part += 1;
-                    if (onProgress) onProgress(part, totalParts);
                     var chunk = file.slice(offset, Math.min(offset + PAGE_CONFIG.chunkSize, file.size));
-                    var chunkData = await uploadRequest(chunk);
+                    var chunkStart = offset;
+                    var chunkData = await uploadRequest(chunk, null, function (ratio) {
+                        report((chunkStart + ratio * chunk.size) / file.size);
+                    });
                     index += '\n' + String(chunkData.message || '').replace(/^\/d\//, '');
                     offset += chunk.size;
                 }
                 var indexFile = new File([index], 'fileAll.txt', { type: 'text/plain' });
                 var indexData = await uploadRequest(indexFile, 'fileAll.txt');
+                report(1);
                 return { name: file.name, link: indexData.message };
             }
 
@@ -280,6 +319,7 @@
                     for (var i = 0; i < files.length; i += 1) {
                         var file = files[i];
                         setMeta('正在上传 ' + (i + 1) + ' / ' + files.length + ' · ' + file.name);
+                        setLoading('正在上传 ' + file.name);
                         if (quotaLeft() <= 0) {
                             showError(new Error('今日上传次数已用完，每天最多上传 ' + PAGE_CONFIG.dailyLimit + ' 个'), file.name);
                             break;
@@ -289,9 +329,7 @@
                             continue;
                         }
                         try {
-                            var result = await uploadFile(file, function (part, parts) {
-                                setLoading('正在上传 ' + file.name + '（分片 ' + part + ' / ' + parts + '）');
-                            });
+                            var result = await uploadFile(file, setProgress);
                             consumeQuota();
                             showSuccess(file, result);
                             addHistory(result.name, result.link);

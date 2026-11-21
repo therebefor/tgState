@@ -23,14 +23,13 @@ func UploadImageAPI(w http.ResponseWriter, r *http.Request) {
 		// 获取上传的文件
 		file, header, err := r.FormFile("image")
 		if err != nil {
-			errJsonMsg("Unable to get file", w)
-			// http.Error(w, "Unable to get file", http.StatusBadRequest)
+			errJsonMsg("无法获取上传的文件，请重新选择后再试", w)
 			return
 		}
 		defer file.Close()
 		if conf.Mode != "p" && header.Size > 20*1024*1024 {
 			// 图床模式：单张图片不超过 20 MB；网盘模式（mode=p）不受此限制
-			errJsonMsg("File size exceeds 20MB limit", w)
+			errJsonMsg("图片不能超过 20 MB", w)
 			return
 		}
 		// 检查文件类型
@@ -44,13 +43,12 @@ func UploadImageAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if conf.Mode != "p" && !valid {
-			errJsonMsg("Invalid file type. Only .jpg, .jpeg, and .png are allowed.", w)
-			// http.Error(w, "Invalid file type. Only .jpg, .jpeg, and .png are allowed.", http.StatusBadRequest)
+			errJsonMsg("仅支持 JPG / PNG 格式的图片", w)
 			return
 		}
 		res := conf.UploadResponse{
 			Code:    0,
-			Message: "error",
+			Message: "上传失败，请稍后重试",
 		}
 		fileID, msgID, chatID := utils.UpDocument(utils.TgFileData(header.Filename, file))
 		img := conf.FileRoute + fileID
@@ -71,7 +69,7 @@ func UploadImageAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 如果不是POST请求，返回错误响应
-	http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	http.Error(w, "请求方法不支持，请使用 POST", http.StatusMethodNotAllowed)
 }
 func errJsonMsg(msg string, w http.ResponseWriter) {
 	// 这里示例直接返回JSON响应
@@ -90,7 +88,7 @@ func D(w http.ResponseWriter, r *http.Request) {
 		// 设置响应的状态码为 404
 		w.WriteHeader(http.StatusNotFound)
 		// 写入响应内容
-		w.Write([]byte("404 Not Found"))
+		w.Write([]byte("文件不存在"))
 		return
 	}
 
@@ -98,14 +96,14 @@ func D(w http.ResponseWriter, r *http.Request) {
 	fileUrl, _ := utils.GetDownloadUrl(id)
 	resp, err := http.Get(fileUrl)
 	if err != nil {
-		http.Error(w, "Failed to fetch content", http.StatusInternalServerError)
+		http.Error(w, "获取文件内容失败，请稍后重试", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Disposition", "inline") // 设置为 "inline" 以支持在线播放
 	// 检查Content-Type是否为图片类型
 	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/octet-stream") {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("404 Not Found"))
+		w.Write([]byte("文件不存在"))
 		return
 	}
 	contentLength, err := strconv.Atoi(resp.Header.Get("Content-Length"))
@@ -147,7 +145,7 @@ func D(w http.ResponseWriter, r *http.Request) {
 			}
 			blobResp, err := http.Get(fileUrl)
 			if err != nil {
-				http.Error(w, "Failed to fetch content", http.StatusInternalServerError)
+				http.Error(w, "获取文件内容失败，请稍后重试", http.StatusInternalServerError)
 				return
 			}
 			_, err = io.Copy(w, blobResp.Body)
@@ -162,7 +160,7 @@ func D(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", http.DetectContentType(buffer))
 		_, err = w.Write(buffer[:n])
 		if err != nil {
-			http.Error(w, "Failed to write content", http.StatusInternalServerError)
+			http.Error(w, "写入文件内容失败，请稍后重试", http.StatusInternalServerError)
 			log.Println(http.StatusInternalServerError)
 			return
 		}
@@ -183,20 +181,20 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	}
 	file, err := assets.Templates.ReadFile(htmlPath)
 	if err != nil {
-		http.Error(w, "HTML file not found", http.StatusNotFound)
+		http.Error(w, "页面模板不存在", http.StatusNotFound)
 		return
 	}
 	// 读取头部模板
 	headerFile, err := assets.Templates.ReadFile("templates/header.tmpl")
 	if err != nil {
-		http.Error(w, "Header template not found", http.StatusNotFound)
+		http.Error(w, "页面头部模板不存在", http.StatusNotFound)
 		return
 	}
 
 	// 读取页脚模板
 	footerFile, err := assets.Templates.ReadFile("templates/footer.tmpl")
 	if err != nil {
-		http.Error(w, "Footer template not found", http.StatusNotFound)
+		http.Error(w, "页面底部模板不存在", http.StatusNotFound)
 		return
 	}
 
@@ -204,21 +202,21 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.New("html")
 	tmpl, err = tmpl.Parse(string(headerFile))
 	if err != nil {
-		http.Error(w, "Error parsing header template", http.StatusInternalServerError)
+		http.Error(w, "页面头部模板解析失败", http.StatusInternalServerError)
 		return
 	}
 
 	// 包括主HTML内容
 	tmpl, err = tmpl.Parse(string(file))
 	if err != nil {
-		http.Error(w, "Error parsing HTML template", http.StatusInternalServerError)
+		http.Error(w, "页面模板解析失败", http.StatusInternalServerError)
 		return
 	}
 
 	// 包括页脚
 	tmpl, err = tmpl.Parse(string(footerFile))
 	if err != nil {
-		http.Error(w, "Error parsing footer template", http.StatusInternalServerError)
+		http.Error(w, "页面底部模板解析失败", http.StatusInternalServerError)
 		return
 	}
 
@@ -226,7 +224,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	err = tmpl.Execute(w, nil)
 	if err != nil {
-		http.Error(w, "Error rendering HTML template", http.StatusInternalServerError)
+		http.Error(w, "页面渲染失败", http.StatusInternalServerError)
 	}
 }
 
@@ -235,33 +233,33 @@ func Pwd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		file, err := assets.Templates.ReadFile("templates/pwd.tmpl")
 		if err != nil {
-			http.Error(w, "HTML file not found", http.StatusNotFound)
+			http.Error(w, "页面模板不存在", http.StatusNotFound)
 			return
 		}
 		// 读取头部模板
 		headerFile, err := assets.Templates.ReadFile("templates/header.tmpl")
 		if err != nil {
-			http.Error(w, "Header template not found", http.StatusNotFound)
+			http.Error(w, "页面头部模板不存在", http.StatusNotFound)
 			return
 		}
 
 		// 创建HTML模板并包括头部
 		tmpl := template.New("html")
 		if tmpl, err = tmpl.Parse(string(headerFile)); err != nil {
-			http.Error(w, "Error parsing Header template", http.StatusInternalServerError)
+			http.Error(w, "页面头部模板解析失败", http.StatusInternalServerError)
 			return
 		}
 
 		// 包括主HTML内容
 		if tmpl, err = tmpl.Parse(string(file)); err != nil {
-			http.Error(w, "Error parsing File template", http.StatusInternalServerError)
+			http.Error(w, "页面模板解析失败", http.StatusInternalServerError)
 			return
 		}
 
 		// 直接将HTML内容发送给客户端
 		w.Header().Set("Content-Type", "text/html")
 		if err := tmpl.Execute(w, nil); err != nil {
-			http.Error(w, "Error rendering HTML template", http.StatusInternalServerError)
+			http.Error(w, "页面渲染失败", http.StatusInternalServerError)
 		}
 		return
 	}

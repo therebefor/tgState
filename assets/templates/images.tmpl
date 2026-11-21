@@ -36,8 +36,15 @@
                     </div>
                 </div>
                 <div id="loading" class="status" hidden>
-                    <span class="spinner" aria-hidden="true"></span>
-                    <span id="loadingText">正在上传…</span>
+                    <div class="status-row">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span id="loadingText" class="status-file">正在上传…</span>
+                        <span id="loadingPercent" class="status-percent">0%</span>
+                    </div>
+                    <div id="progress" class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                        aria-valuenow="0" aria-label="上传进度">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
                 </div>
                 <div id="response" class="response-list" aria-live="polite"></div>
                 <details id="history" class="history" hidden>

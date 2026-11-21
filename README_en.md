@@ -25,6 +25,12 @@ Demo image:
 
 ![tgState image host UI](docs/screenshot.jpg)
 
+# UI
+
+- Uploads show a progress bar with percentage; chunked uploads report aggregated progress
+- All UI hints and error messages are in Chinese
+- Supports drag & drop, clipboard paste, upload history and one-click link copying
+
 # Parameter Description
 
 Mandatory parameters:
